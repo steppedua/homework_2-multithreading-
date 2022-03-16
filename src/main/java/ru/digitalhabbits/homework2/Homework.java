@@ -2,9 +2,10 @@ package ru.digitalhabbits.homework2;
 
 import javax.annotation.Nonnull;
 import java.util.Scanner;
+import java.util.concurrent.BrokenBarrierException;
 
 public class Homework {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws BrokenBarrierException, InterruptedException {
         final String processingFileName = getProcessingFileName(args);
         final String resultFileName = getResultFileName(args);
         new FileProcessor()
