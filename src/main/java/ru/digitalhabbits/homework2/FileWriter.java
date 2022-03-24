@@ -7,7 +7,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.*;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import static java.lang.Thread.currentThread;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -15,50 +16,29 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class FileWriter implements Runnable {
     private static final Logger logger = getLogger(FileWriter.class);
 
-    private final File file;
-    private final Exchanger<String> exchanger;
-    private String message;
-    //        private final Phaser phaser;
-    private final CyclicBarrier cyclicBarrier;
+    private final File resultFile;
+    private final TreeMap<Integer, String> lineNumberAndResultConcatenationPairMap;
 
-    //        public FileWriter(File resFile, Exchanger<String> exchanger, Phaser phaser) {
-//        this.file = resFile;
-//        this.exchanger = exchanger;
-//        this.phaser = phaser;
-//        phaser.register();
-//    }
-    public FileWriter(File resFile, Exchanger<String> exchanger, CyclicBarrier cyclicBarrier) {
-        this.file = resFile;
-        this.exchanger = exchanger;
-        this.cyclicBarrier = cyclicBarrier;
+    public FileWriter(File resultFile, TreeMap<Integer, String> lineNumberAndResultConcatenationPairMap) {
+        this.resultFile = resultFile;
+        this.lineNumberAndResultConcatenationPairMap = lineNumberAndResultConcatenationPairMap;
     }
-
 
     @Override
     public void run() {
 
         logger.info("Started writer thread {}", currentThread().getName());
 
-        try (OutputStreamWriter out = new OutputStreamWriter(new FileOutputStream(file, true), StandardCharsets.UTF_8)) {
+        try (OutputStreamWriter out = new OutputStreamWriter(new FileOutputStream(resultFile, true), StandardCharsets.UTF_8)) {
 
-            logger.info("Phase {} in FileWriter started", 2);
+            String collect = lineNumberAndResultConcatenationPairMap
+                    .values()
+                    .stream()
+                    .parallel()
+                    .collect(Collectors.joining("\n"));
 
-            message = exchanger.exchange("edfdswf", 1000, TimeUnit.MINUTES);
-
-            logger.info("FileWriter {}", message);
-
-            out.write(message);
-
-            logger.info("Phase {} in FileWriter finished", 2);
-//            Thread.sleep(100);
-            try {
-                cyclicBarrier.await();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (BrokenBarrierException e) {
-                e.printStackTrace();
-            }
-        } catch (IOException | InterruptedException | TimeoutException e) {
+            out.write(collect);
+        } catch (IOException e) {
             e.printStackTrace();
         }
 

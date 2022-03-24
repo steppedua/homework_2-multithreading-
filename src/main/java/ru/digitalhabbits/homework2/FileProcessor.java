@@ -3,50 +3,49 @@ package ru.digitalhabbits.homework2;
 import org.slf4j.Logger;
 
 import javax.annotation.Nonnull;
-import java.io.File;
-import java.io.IOException;
-import java.util.Scanner;
+import java.io.*;
+import java.util.TreeMap;
 import java.util.concurrent.*;
 
-import static java.nio.charset.Charset.defaultCharset;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class FileProcessor {
     private static final Logger logger = getLogger(FileProcessor.class);
-    //TODO: Тут работает с двумя потокам, если > 2 потоков, то будет простой, метод shutdownNow()
-    // не сработал, кидает кучу Exception
-    //public static final int CHUNK_SIZE = 2 * getRuntime().availableProcessors();
-    public static final int CHUNK_SIZE = 2;
+//    public static final int CHUNK_SIZE = 2 * getRuntime().availableProcessors();
 
-    private static final ExecutorService executorService = Executors.newFixedThreadPool(CHUNK_SIZE);
-    private static final Exchanger<String> exchanger = new Exchanger<>();
-    private static final CyclicBarrier cyclicBarrier = new CyclicBarrier(CHUNK_SIZE);
+    private static final TreeMap<Integer, String> lineNumberAndResultConcatenationPairMap = new TreeMap<>();
 
     public void process(@Nonnull String processingFileName, @Nonnull String resultFileName) throws InterruptedException, BrokenBarrierException {
-        checkFileExists(processingFileName);
+
+        //Условно CHUNK_SIZE заменили на количество линий в текстовом файле
+        int chunkSize = getNumberLinesInFile(processingFileName);
+
+        final ExecutorService executorService = Executors.newFixedThreadPool(chunkSize);
 
         final File file = new File(processingFileName);
-        final File resFile = new File(resultFileName);
+        final File resultFile = new File(resultFileName);
 
-        // TODO: NotImplemented: запускаем FileWriter в отдельном потоке
-        try (final Scanner scanner = new Scanner(file, defaultCharset())) {
-            while (scanner.hasNext()) {
+        final CyclicBarrier cyclicBarrier = new CyclicBarrier(
+                chunkSize,
+                new FileWriter(resultFile, lineNumberAndResultConcatenationPairMap)
+        );
 
-                // TODO: NotImplemented: вычитываем CHUNK_SIZE строк для параллельной обработки
-                //  Для чего это???
+        try (final LineNumberReader lineNumberReader = new LineNumberReader(new FileReader(file))) {
+            String line;
+            while ((line = lineNumberReader.readLine()) != null) {
 
-                // TODO: NotImplemented: обрабатывать строку с помощью LineProcessor. Каждый поток обрабатывает свою строку.
-                executorService.submit(new LineCounterProcessor(scanner.nextLine(), exchanger, cyclicBarrier));
-
-                // TODO: NotImplemented: добавить обработанные данные в результирующий файл
-                executorService.submit(new FileWriter(resFile, exchanger, cyclicBarrier));
-
+                executorService.submit(new LineCounterProcessor(
+                        line,
+                        lineNumberReader.getLineNumber(),
+                        lineNumberAndResultConcatenationPairMap,
+                        cyclicBarrier)
+                );
             }
-        } catch (IOException exception) {
-            logger.error("", exception);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
-        // TODO: NotImplemented: остановить поток writerThread
+        cyclicBarrier.await();
 
         executorService.shutdown();
         executorService.awaitTermination(1, TimeUnit.HOURS);
@@ -54,7 +53,23 @@ public class FileProcessor {
         logger.info("Finish main thread {}", Thread.currentThread().getName());
     }
 
-    private void checkFileExists(@Nonnull String fileName) {
+    private static int getNumberLinesInFile(@Nonnull String processingFileName) {
+        checkFileExists(processingFileName);
+        try (final LineNumberReader lineNumberReader = new LineNumberReader(new BufferedReader(new FileReader(processingFileName)))) {
+            int countLines = 0;
+            while (lineNumberReader.readLine() != null) {
+                countLines++;
+            }
+            //На 1 больше, т.к. в строке 43 есть еще один cyclicBarrier.await();
+            return countLines + 1;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return 0;
+    }
+
+    private static void checkFileExists(@Nonnull String fileName) {
         final File file = new File(fileName);
         if (!file.exists() || file.isDirectory()) {
             throw new IllegalArgumentException("File '" + fileName + "' not exists");

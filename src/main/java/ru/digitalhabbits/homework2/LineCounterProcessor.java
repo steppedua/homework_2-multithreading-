@@ -5,7 +5,9 @@ import org.slf4j.Logger;
 
 import javax.annotation.Nonnull;
 import java.util.Random;
-import java.util.concurrent.*;
+import java.util.TreeMap;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 
 import static java.lang.System.currentTimeMillis;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -18,20 +20,15 @@ public class LineCounterProcessor implements LineProcessor<Integer>, Runnable {
 
     private final Random random = new Random(currentTimeMillis());
 
-    private final String lineInFile;
-    private final Exchanger<String> exchanger;
-    //    private final Phaser phaser;
+    private final String valueLineInFile;
+    private final TreeMap<Integer, String> lineNumberAndResultConcatenationPairMap;
+    private final int lineNumber;
     private final CyclicBarrier cyclicBarrier;
 
-    //    public LineCounterProcessor(String line, Exchanger<String> exchanger, Phaser phaser) {
-//        this.lineInFile = line;
-//        this.exchanger = exchanger;
-//        this.phaser = phaser;
-//        phaser.register();
-//    }
-    public LineCounterProcessor(String line, Exchanger<String> exchanger, CyclicBarrier cyclicBarrier) {
-        this.lineInFile = line;
-        this.exchanger = exchanger;
+    public LineCounterProcessor(String valueLineInFile, int lineNumber, TreeMap<Integer, String> lineNumberAndResultConcatenationPairMap, CyclicBarrier cyclicBarrier) {
+        this.valueLineInFile = valueLineInFile;
+        this.lineNumber = lineNumber;
+        this.lineNumberAndResultConcatenationPairMap = lineNumberAndResultConcatenationPairMap;
         this.cyclicBarrier = cyclicBarrier;
     }
 
@@ -54,25 +51,19 @@ public class LineCounterProcessor implements LineProcessor<Integer>, Runnable {
     @Override
     public void run() {
 
+        logger.info("Phase {} in LineCounterProcessor started", 1);
+        Pair<String, Integer> resultProcess = process(valueLineInFile);
+        String resultConcatenationPair = resultProcess.getLeft() + " " + resultProcess.getRight();
+
+        lineNumberAndResultConcatenationPairMap.put(lineNumber, resultConcatenationPair);
+
+        logger.info("Phase {} in LineCounterProcessor finished", 1);
+
         try {
-            logger.info("Phase {} in LineCounterProcessor started", 1);
-            Pair<String, Integer> process = process(lineInFile);
-            String s = process.getLeft() + " " + process.getRight() + "\n";
-
-//            exchanger.exchange(s, 1000, TimeUnit.MINUTES);
-            logger.info("LineCounterProcessor {}", exchanger.exchange(s, 1000, TimeUnit.HOURS));
-
-
-            logger.info("Phase {} in LineCounterProcessor finished", 1);
-//            Thread.sleep(100);
-            try {
-                cyclicBarrier.await();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (BrokenBarrierException e) {
-                e.printStackTrace();
-            }
-        } catch (InterruptedException | TimeoutException e) {
+            cyclicBarrier.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (BrokenBarrierException e) {
             e.printStackTrace();
         }
 

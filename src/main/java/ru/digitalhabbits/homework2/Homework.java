@@ -6,10 +6,11 @@ import java.util.concurrent.BrokenBarrierException;
 
 public class Homework {
     public static void main(String[] args) throws BrokenBarrierException, InterruptedException {
-        final String processingFileName = getProcessingFileName(args);
-        final String resultFileName = getResultFileName(args);
+//        final String processingFileName = getProcessingFileName(args);
+//        final String resultFileName = getResultFileName(args);
         new FileProcessor()
-                .process(processingFileName, resultFileName);
+                .process("/Users/edstepa/Desktop/ДЗ2/src/main/java/ru/digitalhabbits/homework2/lol.txt",
+                        "/Users/edstepa/Desktop/ДЗ2/src/main/java/ru/digitalhabbits/homework2/lol2.txt");
     }
 
     @Nonnull
